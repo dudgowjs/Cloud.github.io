@@ -1,0 +1,897 @@
+```html
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GCloud - 클라우드 드라이브</title>
+    <!-- Bootstrap 5 CSS CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- Ace Editor CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.9/ace.js" type="text/javascript" charset="utf-8"></script>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --text-color: #212529;
+            --card-bg: #ffffff;
+            --card-border: #e9ecef;
+            --nav-bg: #ffffff;
+            --input-bg: #ffffff;
+            --item-hover: #f1f3f5;
+            --notice-text-color: #6c757d;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg-color: #121212;
+                --text-color: #f8f9fa;
+                --card-bg: #1e1e1e;
+                --card-border: #2c2c2c;
+                --nav-bg: #1e1e1e;
+                --input-bg: #2d2d2d;
+                --item-hover: #2a2a2a;
+                --notice-text-color: #adb5bd;
+            }
+            body {
+                background-color: var(--bg-color) !important;
+                color: var(--text-color) !important;
+            }
+            .modal-content {
+                background-color: #1e1e1e !important;
+                color: #f8f9fa !important;
+            }
+            .form-control, .input-group-text {
+                background-color: #2d2d2d !important;
+                color: #ffffff !important;
+                border-color: #3d3d3d !important;
+            }
+            .form-control::placeholder {
+                color: #aaa !important;
+            }
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            min-height: 100vh;
+        }
+
+        .navbar-custom {
+            background-color: var(--nav-bg);
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+            gap: 12px;
+        }
+
+        @media (min-width: 576px) {
+            .gallery-grid {
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+                gap: 16px;
+            }
+        }
+
+        .gallery-card {
+            aspect-ratio: 1 / 1;
+            border-radius: 20px;
+            overflow: hidden;
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            position: relative;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            cursor: pointer;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .gallery-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 18px rgba(0,0,0,0.12);
+        }
+
+        .gallery-item {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+
+        .gallery-item .file-name {
+            font-size: 0.825rem;
+            font-weight: 600;
+            margin-top: 6px;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding: 0 4px;
+            color: var(--text-color);
+        }
+
+        .gallery-card img, .gallery-card video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .gallery-card .code-preview {
+            width: 100%;
+            height: 100%;
+            padding: 10px;
+            background: #0d1117;
+            color: #58a6ff;
+            font-family: monospace;
+            font-size: 8px;
+            overflow: hidden;
+            line-height: 1.2;
+            word-break: break-all;
+        }
+
+        .gallery-card .icon-preview {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--input-bg);
+        }
+
+        .gallery-card .card-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(2px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 10px;
+        }
+
+        .gallery-card:hover .card-overlay,
+        .gallery-card.show-overlay .card-overlay {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #fileViewerModal .modal-content {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #fileViewerModal .modal-body {
+            position: relative;
+            flex: 1 1 auto;
+            overflow: hidden;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #codeEditorWrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            flex: 1 1 auto;
+        }
+
+        #aceEditorContainer {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+
+        #iframeViewerWrapper {
+            width: 100%;
+            height: 100%;
+            flex: 1 1 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: auto;
+            background-color: var(--bg-color);
+        }
+
+        .file-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: #fff;
+            object-fit: contain;
+        }
+
+        .empty-file-text {
+            color: var(--notice-text-color);
+            word-break: keep-all;
+            font-size: 0.95rem;
+        }
+
+        #loggedOutView {
+            min-height: calc(100vh - 80px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        #loadingOverlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(3px);
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            color: #fff;
+        }
+    </style>
+</head>
+<body class="d-flex flex-column min-vh-100">
+
+    <!-- 전역 로딩 오버레이 -->
+    <div id="loadingOverlay">
+        <div class="spinner-border text-light mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
+        <h5 class="fw-bold" id="loadingText">처리 중입니다...</h5>
+    </div>
+
+    <!-- 상단 네비게이션 바 -->
+    <nav class="navbar navbar-expand navbar-custom sticky-top">
+        <div class="container-fluid px-3 px-md-4">
+            <a class="navbar-brand d-flex align-items-center gap-2 fw-bold me-auto ms-1 text-reset" href="#">
+                <i class="bi bi-cloud-check-fill text-primary fs-3"></i>
+                <span class="fs-4" id="appTitle">GCloud</span>
+                <span class="badge bg-primary rounded-pill fs-6 ms-1" id="fileCountBadge" style="display: none !important;">0</span>
+            </a>
+
+            <div id="loggedInControls" class="d-flex align-items-center gap-2" style="display: none !important;">
+                <button type="button" class="btn btn-primary rounded-circle p-0 d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px;" id="uploadBtn" onclick="document.getElementById('fileInput').click()" title="파일 업로드">
+                    <i class="bi bi-plus-lg fs-5"></i>
+                </button>
+
+                <div id="authContainer" class="dropdown">
+                    <button type="button" class="btn btn-outline-secondary rounded-circle p-0 d-flex align-items-center justify-content-center shadow-sm overflow-hidden" style="width: 38px; height: 38px; cursor: pointer;" id="profileDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false" title="계정 메뉴">
+                        <i class="bi bi-person-fill fs-5"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow border-0 rounded-4 mt-2 p-2" id="profileDropdownMenu" style="min-width: 220px;">
+                    </ul>
+                </div>
+            </div>
+
+            <input type="file" id="fileInput" class="d-none" multiple>
+        </div>
+    </nav>
+
+    <!-- 메인 컨텐츠 영역 -->
+    <main class="container py-4 flex-grow-1" id="loggedInView" style="max-width: 900px; display: none;">
+        <div class="row g-2 mb-4 align-items-center">
+            <div class="col-12">
+                <div class="input-group shadow-sm rounded-pill overflow-hidden border">
+                    <span class="input-group-text border-0 text-muted ps-3"><i class="bi bi-search"></i></span>
+                    <input type="text" id="searchInput" class="form-control border-0 shadow-none ps-0" placeholder="클라우드 파일 검색...">
+                </div>
+            </div>
+        </div>
+
+        <div class="gallery-grid" id="fileListContainer"></div>
+    </main>
+
+    <!-- 비로그인 화면 -->
+    <div class="container flex-grow-1" id="loggedOutView">
+        <div class="py-5 px-3">
+            <div class="mb-4 position-relative d-inline-block">
+                <div class="bg-primary bg-opacity-10 rounded-circle p-4 d-inline-flex align-items-center justify-content-center shadow-sm" style="width: 120px; height: 120px;">
+                    <i class="bi bi-person-circle text-primary" style="font-size: 4.5rem;"></i>
+                </div>
+                <span class="position-absolute bottom-0 end-0 bg-primary text-white p-2 rounded-circle shadow d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                    <i class="bi bi-cloud-fill fs-6"></i>
+                </span>
+            </div>
+            <h3 class="fw-bold mb-3">GCloud 드라이브</h3>
+            <p class="empty-file-text mb-4 fs-6">
+                구글 계정으로 로그인하여 나만의 파일과 소스코드를<br>클라우드에 동기화하고 자유롭게 편집해보세요.
+            </p>
+            <button type="button" class="btn btn-primary btn-lg rounded-pill px-4 shadow-sm fw-bold d-inline-flex align-items-center gap-2" id="googleLoginBtn">
+                <i class="bi bi-google fs-5"></i> 구글 계정으로 로그인
+            </button>
+        </div>
+    </div>
+
+    <!-- 삭제 확인 모달 -->
+    <div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content p-4 rounded-4 shadow border-0">
+                <div class="text-center py-2">
+                    <div class="text-warning mb-3">
+                        <i class="bi bi-exclamation-triangle-fill display-4"></i>
+                    </div>
+                    <h5 class="fw-bold mb-2">파일 영구 삭제</h5>
+                    <p class="text-muted mb-4 small" id="confirmMessage">정말 이 파일을 삭제하시겠습니까?</p>
+                    <div class="d-flex gap-2 justify-content-center">
+                        <button type="button" class="btn btn-outline-secondary px-4 rounded-pill" data-bs-dismiss="modal">취소</button>
+                        <button type="button" class="btn btn-danger px-4 rounded-pill" id="confirmDeleteBtn">삭제</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 계정 모달 -->
+    <div class="modal fade" id="accountModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content p-4 rounded-4 shadow border-0 text-center">
+                <img id="modalUserPhoto" src="" class="rounded-circle mx-auto mb-3 border shadow-sm" width="80" height="80" alt="프로필">
+                <h5 class="fw-bold mb-1" id="modalUserName">사용자 이름</h5>
+                <p class="text-muted small mb-4" id="modalUserEmail">email@domain.com</p>
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-outline-danger rounded-pill" id="modalLogoutBtn">로그아웃</button>
+                    <button type="button" class="btn btn-secondary rounded-pill" data-bs-dismiss="modal">닫기</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 로그인/오류 알림 모달 -->
+    <div class="modal fade" id="errorModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content p-4 rounded-4 shadow border-0 text-center">
+                <div class="text-danger mb-3">
+                    <i class="bi bi-exclamation-circle-fill display-4"></i>
+                </div>
+                <h5 class="fw-bold mb-2" id="errorModalTitle">로그인중 에러</h5>
+                <p class="text-muted mb-3 small text-break" id="errorModalMessage">오류가 발생했습니다.</p>
+                <p class="text-secondary small text-break mb-4">오류가 지속되는 경우 <a href="mailto:wjsdudgo11313@gmail.com" class="text-primary text-decoration-underline">문의하기</a>를 눌러주세요.<br>최대한 답변드리겠습니다.</p>
+                <div class="d-flex justify-content-center">
+                    <button type="button" class="btn btn-primary px-4 rounded-pill" data-bs-dismiss="modal">확인</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 파일 뷰어 모달 -->
+    <div class="modal fade" id="fileViewerModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content">
+                <div class="modal-header border-bottom px-4 py-3 d-flex align-items-center justify-content-between">
+                    <h5 class="modal-title fw-bold text-truncate m-0 fs-5" id="modalFileName">파일명</h5>
+                    <button type="button" class="btn-close shadow-none fs-5" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div id="codeEditorWrapper" style="display: none;">
+                        <div id="aceEditorContainer"></div>
+                    </div>
+                    <div id="iframeViewerWrapper" style="display: none;" class="w-100 h-100 align-items-center justify-content-center">
+                        <iframe id="fileIframe" class="file-iframe" src=""></iframe>
+                    </div>
+                </div>
+                <div class="modal-footer border-top px-4 py-3 d-flex justify-content-end gap-2 bg-body">
+                    <button type="button" class="btn btn-secondary px-4 rounded-pill" data-bs-dismiss="modal">닫기</button>
+                    <button type="button" class="btn btn-primary px-4 rounded-pill" id="saveFileBtn" style="display: none;">클라우드 저장</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Firebase SDK Modular (v10) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, collection, addDoc, deleteDoc, updateDoc, doc, onSnapshot, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+
+        // Firebase 프로젝트 설정
+        const firebaseConfig = {
+            apiKey: "AIzaSyAjvFc7BZ5sfY6P-Hy-rH_rNvx_TCmGpyw",
+            authDomain: "glogin-e1451.firebaseapp.com",
+            projectId: "glogin-e1451",
+            storageBucket: "glogin-e1451.firebasestorage.app",
+            messagingSenderId: "786508231265",
+            appId: "1:786508231265:web:82f2d31b75790f608af020"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+        const googleProvider = new GoogleAuthProvider();
+
+        let files = [];
+        let unsubscribeFiles = null;
+        let aceEditor = null;
+        let currentEditingId = null;
+        let fileToDelete = null;
+        let confirmModalInstance = null;
+        let fileViewerModalInstance = null;
+        let accountModalInstance = null;
+        let errorModalInstance = null;
+        let currentUser = null;
+
+        function showLoading(text = "처리 중입니다...") {
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                document.getElementById('loadingText').innerText = text;
+                overlay.style.display = 'flex';
+            }
+        }
+
+        function hideLoading() {
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                overlay.style.display = 'none';
+            }
+        }
+
+        function showErrorModal(title, message) {
+            document.getElementById('errorModalTitle').innerText = title;
+            document.getElementById('errorModalMessage').innerText = message;
+            if (errorModalInstance) {
+                errorModalInstance.show();
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.gallery-card')) {
+                    document.querySelectorAll('.gallery-card.show-overlay').forEach(c => c.classList.remove('show-overlay'));
+                }
+            });
+
+            confirmModalInstance = new bootstrap.Modal(document.getElementById('confirmModal'));
+            fileViewerModalInstance = new bootstrap.Modal(document.getElementById('fileViewerModal'));
+            accountModalInstance = new bootstrap.Modal(document.getElementById('accountModal'));
+            errorModalInstance = new bootstrap.Modal(document.getElementById('errorModal'));
+
+            if (window.ace) {
+                aceEditor = ace.edit("aceEditorContainer");
+                aceEditor.setTheme("ace/theme/twilight");
+                aceEditor.getSession().setMode("ace/mode/javascript");
+                aceEditor.setOptions({
+                    fontSize: "14pt",
+                    showPrintMargin: false,
+                    highlightActiveLine: true
+                });
+            }
+
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                searchInput.addEventListener('input', (e) => {
+                    renderFiles(e.target.value.trim().toLowerCase());
+                });
+            }
+
+            // Event Listeners
+            document.getElementById('googleLoginBtn')?.addEventListener('click', handleGoogleLogin);
+            document.getElementById('fileInput')?.addEventListener('change', handleFileSelect);
+            document.getElementById('saveFileBtn')?.addEventListener('click', saveCodeContent);
+            document.getElementById('modalLogoutBtn')?.addEventListener('click', handleLogout);
+        });
+
+        // Firebase Auth 상태 감지
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            updateUserUI(user);
+
+            if (user) {
+                subscribeToUserFiles(user.uid);
+            } else {
+                if (unsubscribeFiles) {
+                    unsubscribeFiles();
+                    unsubscribeFiles = null;
+                }
+                files = [];
+                renderFiles();
+            }
+        });
+
+        function updateUserUI(user) {
+            const loggedInControls = document.getElementById('loggedInControls');
+            const profileDropdownBtn = document.getElementById('profileDropdownBtn');
+            const profileDropdownMenu = document.getElementById('profileDropdownMenu');
+            const fileCountBadge = document.getElementById('fileCountBadge');
+            const loggedInView = document.getElementById('loggedInView');
+            const loggedOutView = document.getElementById('loggedOutView');
+
+            if (user) {
+                if (profileDropdownBtn) {
+                    profileDropdownBtn.innerHTML = `<img src="${user.photoURL || 'https://via.placeholder.com/38'}" width="38" height="38" class="rounded-circle" alt="프로필">`;
+                }
+
+                if (profileDropdownMenu) {
+                    profileDropdownMenu.innerHTML = `
+                        <li class="px-3 py-2 border-bottom mb-1">
+                            <div class="fw-bold text-truncate">${user.displayName || '사용자'}</div>
+                            <div class="text-muted small text-truncate">${user.email || ''}</div>
+                        </li>
+                        <li>
+                            <button class="dropdown-item rounded-3 py-2 d-flex align-items-center gap-2" id="accountMenuBtn">
+                                <i class="bi bi-person-gear text-secondary fs-5"></i>
+                                <span>계정 정보 관리</span>
+                            </button>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <button class="dropdown-item rounded-3 py-2 d-flex align-items-center gap-2 text-danger" id="logoutMenuBtn">
+                                <i class="bi bi-box-arrow-right fs-5"></i>
+                                <span>로그아웃</span>
+                            </button>
+                        </li>
+                    `;
+                    document.getElementById('accountMenuBtn')?.addEventListener('click', openAccountModal);
+                    document.getElementById('logoutMenuBtn')?.addEventListener('click', handleLogout);
+                }
+
+                if (loggedInControls) loggedInControls.style.setProperty('display', 'flex', 'important');
+                if (fileCountBadge) fileCountBadge.style.setProperty('display', 'inline-block', 'important');
+                if (loggedInView) loggedInView.style.display = 'block';
+                if (loggedOutView) loggedOutView.style.display = 'none';
+            } else {
+                if (loggedInControls) loggedInControls.style.setProperty('display', 'none', 'important');
+                if (fileCountBadge) fileCountBadge.style.setProperty('display', 'none', 'important');
+                if (loggedInView) loggedInView.style.display = 'none';
+                if (loggedOutView) loggedOutView.style.display = 'flex';
+            }
+        }
+
+        function subscribeToUserFiles(uid) {
+            showLoading("파일 실시간 동기화 중...");
+            const q = query(collection(db, "cloud_files"), where("uid", "==", uid));
+            unsubscribeFiles = onSnapshot(q, (snapshot) => {
+                files = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                renderFiles(document.getElementById('searchInput')?.value.trim().toLowerCase() || '');
+                hideLoading();
+            }, (error) => {
+                console.error("실시간 파일 동기화 오류:", error);
+                hideLoading();
+                showErrorModal("동기화 오류", "파일을 불러오는 중 오류가 발생했습니다: " + error.message);
+            });
+        }
+
+        function openAccountModal() {
+            if (!currentUser) return;
+            document.getElementById('modalUserPhoto').src = currentUser.photoURL || '';
+            document.getElementById('modalUserName').innerText = currentUser.displayName || '사용자';
+            document.getElementById('modalUserEmail').innerText = currentUser.email || '';
+            accountModalInstance.show();
+        }
+
+        async function handleGoogleLogin() {
+            showLoading("구글 로그인 진행 중...");
+            try {
+                await signInWithPopup(auth, googleProvider);
+            } catch (error) {
+                console.error("구글 로그인 실패:", error);
+                let friendlyMsg = error.message;
+                if (error.code === 'auth/popup-closed-by-user') {
+                    friendlyMsg = '로그인 팝업 창이 닫혔습니다. 다시 시도해 주세요.';
+                } else if (error.code === 'auth/unauthorized-domain') {
+                    friendlyMsg = '현재 도메인이 Firebase Auth 승인된 도메인(Authorized domain)에 등록되어 있지 않습니다.';
+                } else if (error.code === 'auth/popup-blocked') {
+                    friendlyMsg = '브라우저 팝업이 차단되었습니다. 팝업 차단을 해제한 후 다시 시도해 주세요.';
+                }
+                showErrorModal("로그인 실패", friendlyMsg);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function handleLogout() {
+            if (accountModalInstance) accountModalInstance.hide();
+            showLoading("로그아웃 중...");
+            try {
+                await signOut(auth);
+            } catch (error) {
+                console.error("로그아웃 실패:", error);
+                showErrorModal("로그아웃 오류", "로그아웃 중 오류가 발생했습니다: " + error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function formatBytes(bytes) {
+            if (!bytes || bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        function renderFiles(keyword = '') {
+            const container = document.getElementById('fileListContainer');
+            if (!container) return;
+            
+            container.innerHTML = '';
+            let list = files.filter(file => file.name && file.name.toLowerCase().includes(keyword));
+            
+            const countBadge = document.getElementById('fileCountBadge');
+            if (countBadge) countBadge.innerText = files.length;
+
+            list.sort((a, b) => {
+                if (a.starred !== b.starred) return b.starred ? 1 : -1;
+                return (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0);
+            });
+
+            if (list.length === 0) {
+                container.innerHTML = `
+                    <div class="grid-column-full w-100 py-4 text-center" style="grid-column: 1 / -1;">
+                        <p class="empty-file-text mb-0">저장된 파일이 없습니다.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            list.forEach(file => {
+                const ext = file.name.split('.').pop().toLowerCase();
+                const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext);
+                const isCode = ['js', 'html', 'css', 'json', 'txt', 'py', 'md', 'csv'].includes(ext) || file.type === 'code';
+
+                const itemWrapper = document.createElement('div');
+                itemWrapper.className = 'gallery-item';
+
+                const card = document.createElement('div');
+                card.className = 'gallery-card';
+
+                let contentHtml = '';
+                if (isImage) {
+                    contentHtml = `<img src="${file.downloadURL}" alt="${escapeHtml(file.name)}" loading="lazy">`;
+                } else if (isCode) {
+                    const textSnippet = (file.snippet || '').substring(0, 150);
+                    contentHtml = `<div class="code-preview">${escapeHtml(textSnippet)}</div>`;
+                } else {
+                    contentHtml = `
+                        <div class="icon-preview">
+                            <i class="bi bi-file-earmark-text display-5 text-primary"></i>
+                        </div>
+                    `;
+                }
+
+                card.innerHTML = `
+                    ${contentHtml}
+                    <div class="card-overlay">
+                        <div class="d-flex justify-content-end align-items-center w-100">
+                            <button type="button" class="btn btn-sm text-warning p-0 shadow-none btn-star" title="즐겨찾기">
+                                <i class="bi ${file.starred ? 'bi-star-fill' : 'bi-star'} fs-5"></i>
+                            </button>
+                        </div>
+                        <div class="w-100 d-flex justify-content-center align-items-center gap-2 mb-2">
+                            <button type="button" class="btn btn-light rounded-circle p-0 d-flex align-items-center justify-content-center shadow-sm btn-view" style="width: 36px; height: 36px;" title="보기">
+                                <i class="bi bi-eye-fill fs-6 text-dark"></i>
+                            </button>
+                            <button type="button" class="btn btn-danger rounded-circle p-0 d-flex align-items-center justify-content-center shadow-sm btn-delete" style="width: 36px; height: 36px;" title="삭제">
+                                <i class="bi bi-trash-fill fs-6 text-white"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                card.querySelector('.btn-star').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleStar(file.id, file.starred);
+                });
+                card.querySelector('.btn-view').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openFileViewer(file.id);
+                });
+                card.querySelector('.btn-delete').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    promptDelete(file);
+                });
+
+                card.addEventListener('click', () => {
+                    openFileViewer(file.id);
+                });
+
+                const nameLabel = document.createElement('div');
+                nameLabel.className = 'file-name';
+                nameLabel.innerText = file.name;
+                nameLabel.title = file.name;
+
+                itemWrapper.appendChild(card);
+                itemWrapper.appendChild(nameLabel);
+                container.appendChild(itemWrapper);
+            });
+        }
+
+        async function handleFileSelect(e) {
+            if (!currentUser) {
+                alert("로그인이 필요합니다.");
+                e.target.value = '';
+                return;
+            }
+
+            const selectedFiles = Array.from(e.target.files || []);
+            if (!selectedFiles.length) return;
+
+            showLoading("파일을 클라우드에 업로드 중입니다...");
+
+            try {
+                for (const f of selectedFiles) {
+                    const ext = f.name.split('.').pop().toLowerCase();
+                    const isCode = ['js', 'html', 'css', 'json', 'txt', 'py', 'md', 'csv'].includes(ext);
+
+                    let snippet = '';
+                    if (isCode) {
+                        try {
+                            snippet = await f.text();
+                        } catch (textErr) {
+                            console.warn("텍스트 추출 실패:", textErr);
+                        }
+                    }
+
+                    const storagePath = `users/${currentUser.uid}/files/${Date.now()}_${f.name}`;
+                    const storageRef = ref(storage, storagePath);
+
+                    let downloadURL = "";
+                    try {
+                        const uploadTask = await uploadBytesResumable(storageRef, f);
+                        downloadURL = await getDownloadURL(uploadTask.ref);
+                    } catch (storageError) {
+                        console.warn("Storage 업로드 건너뜀, Firestore 동기화만 수행:", storageError);
+                    }
+
+                    await addDoc(collection(db, "cloud_files"), {
+                        uid: currentUser.uid,
+                        name: f.name,
+                        type: isCode ? 'code' : 'media',
+                        size: formatBytes(f.size),
+                        starred: false,
+                        downloadURL: downloadURL,
+                        storagePath: downloadURL ? storagePath : "",
+                        snippet: snippet,
+                        createdAt: serverTimestamp()
+                    });
+                }
+            } catch (err) {
+                console.error("업로드 에러:", err);
+                alert("업로드 중 오류가 발생했습니다: " + err.message);
+            } finally {
+                hideLoading();
+                e.target.value = '';
+            }
+        }
+
+        function openFileViewer(id) {
+            const file = files.find(f => f.id === id);
+            if (!file) return;
+
+            currentEditingId = id;
+            document.getElementById('modalFileName').innerText = file.name;
+
+            const codeWrapper = document.getElementById('codeEditorWrapper');
+            const iframeWrapper = document.getElementById('iframeViewerWrapper');
+            const iframe = document.getElementById('fileIframe');
+            const saveBtn = document.getElementById('saveFileBtn');
+
+            const ext = file.name.split('.').pop().toLowerCase();
+            const isCode = ['js', 'html', 'css', 'json', 'txt', 'py', 'md', 'csv'].includes(ext) || file.type === 'code';
+
+            if (isCode) {
+                codeWrapper.style.display = 'block';
+                iframeWrapper.style.display = 'none';
+                saveBtn.style.display = 'inline-block';
+
+                let content = file.snippet || '';
+                if (aceEditor) {
+                    let mode = "ace/mode/text";
+                    if (ext === 'js') mode = "ace/mode/javascript";
+                    else if (ext === 'html') mode = "ace/mode/html";
+                    else if (ext === 'css') mode = "ace/mode/css";
+                    else if (ext === 'json') mode = "ace/mode/json";
+                    else if (ext === 'py') mode = "ace/mode/python";
+                    else if (ext === 'md') mode = "ace/mode/markdown";
+
+                    aceEditor.getSession().setMode(mode);
+                    aceEditor.setValue(content, -1);
+                }
+            } else {
+                codeWrapper.style.display = 'none';
+                iframeWrapper.style.display = 'flex';
+                saveBtn.style.display = 'none';
+                iframe.src = file.downloadURL || '';
+            }
+
+            fileViewerModalInstance.show();
+            if (isCode && aceEditor) {
+                setTimeout(() => aceEditor.resize(), 300);
+            }
+        }
+
+        async function saveCodeContent() {
+            if (!currentEditingId || !aceEditor) return;
+
+            const newContent = aceEditor.getValue();
+            showLoading("클라우드 저장 중...");
+
+            try {
+                const docRef = doc(db, "cloud_files", currentEditingId);
+                await updateDoc(docRef, {
+                    snippet: newContent,
+                    size: formatBytes(new Blob([newContent]).size),
+                    updatedAt: serverTimestamp()
+                });
+
+                fileViewerModalInstance.hide();
+            } catch (err) {
+                console.error("저장 실패:", err);
+                alert("저장 중 오류가 발생했습니다: " + err.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function toggleStar(id, currentStarred) {
+            try {
+                const docRef = doc(db, "cloud_files", id);
+                await updateDoc(docRef, {
+                    starred: !currentStarred
+                });
+            } catch (err) {
+                console.error("즐겨찾기 변경 실패:", err);
+            }
+        }
+
+        function promptDelete(file) {
+            fileToDelete = file;
+            document.getElementById('confirmMessage').innerText = `'${file.name}' 파일을 클라우드 드라이브에서 영구 삭제하시겠습니까?`;
+            confirmModalInstance.show();
+        }
+
+        document.getElementById('confirmDeleteBtn')?.addEventListener('click', async () => {
+            if (!fileToDelete) return;
+
+            showLoading("파일 삭제 중...");
+            try {
+                if (fileToDelete.storagePath) {
+                    try {
+                        const fileRef = ref(storage, fileToDelete.storagePath);
+                        await deleteObject(fileRef);
+                    } catch (stErr) {
+                        console.warn("Storage 삭제 에러 (무시 후 계속):", stErr);
+                    }
+                }
+
+                await deleteDoc(doc(db, "cloud_files", fileToDelete.id));
+
+                confirmModalInstance.hide();
+                fileToDelete = null;
+            } catch (err) {
+                console.error("삭제 실패:", err);
+                alert("파일 삭제 실패: " + err.message);
+            } finally {
+                hideLoading();
+            }
+        });
+    </script>
+</body>
+</html>
+```
